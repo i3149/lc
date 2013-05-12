@@ -79,12 +79,13 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
         res = classifier.predict(X_val_scaled[i])
         #print("%f %f %f" % (res[0], y_val[i], (y_val[i] - res[0])))
         if res[0] > 23.0:
-            print(y_val[i])
+            #print(y_val[i])
             total_score += (loans.cost[i] * (y_val[i] / 100.))
+            #total_score += (y_val[i] / 100.)
             invested+=1
-            print(total_score)
+            #print(total_score)
             amount_invested += loans.cost[i]
-            print(loans.ids[i])
+            #print(loans.ids[i])
         else:
             passed+=1
 

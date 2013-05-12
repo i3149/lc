@@ -155,16 +155,16 @@ my @forced_places = (
 #    'annual_inc',
     'sub_grade',
     'purpose',
-    'is_inc_v',
+#    'is_inc_v',
     'emp_length',
-#    'home_ownership',
+    'home_ownership',
 #    'installment',
 #    'acc_now_delinq',
 #    'percent_bc_gt_75',
 #    'dti',
 #    'delinq_2yrs',
 #    'delinq_amnt',
-#    'fico_range_low',
+    'fico_range_low',
 #    'fico_range_high',
 #    'inq_last_6mths',
 #    'mths_since_last_delinq',
@@ -537,7 +537,7 @@ sub get_percent_bc_gt_75{
 sub get_bc_util{return undef}
 sub get_dti{
     my $l = shift;
-    return $l;
+    return int($l);
 }
 sub get_delinq_2yrs{
     my $l = shift;
@@ -550,7 +550,16 @@ sub get_delinq_amnt{
 sub get_earliest_cr_line{return undef}
 sub get_fico_range_low{
     my $l = shift;
-    return ($l ne "")? $l: 0.0;
+    switch ($l) {
+        case {0 < $l && $l <= 200} { return 100; }
+        case {200 < $l && $l <= 300} { return 200; }
+        case {300 < $l && $l <= 400} { return 300; }
+        case {400 < $l && $l <= 400} { return 400; }
+        case {500 < $l && $l <= 600} { return 500; }
+        case {600 < $l && $l <= 700} { return 600; }
+        case {700 < $l} { return 700; }
+    }
+    return undef;
 }
 sub get_fico_range_high{
     my $l = shift;
