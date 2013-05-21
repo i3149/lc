@@ -6,13 +6,15 @@ use Text::CSV;
 use Switch;
 use Date::Parse;
 use List::Util qw(reduce max);
+use Finance::Performance::Calc qw (:all);
 
 ## Load up the zips
 
 my $zip_file            = $ARGV[0];
 my $loan_file           = $ARGV[1];
 my $training_init       = $ARGV[2];
-my $debug               = $ARGV[3];
+my $feature_set         = $ARGV[3];
+my $debug               = $ARGV[4];
 my $city                = {};
 my $CURRENT_TIME        = time();
 
@@ -197,6 +199,52 @@ my @forced_places = (
 #    'total_rec_int',
     );
 
+my @on_places = (
+    'id',
+    'str_rep',
+    'payoff',
+    'cost',
+    'funded_amnt',
+    'zip',
+    'term',
+    'apr',
+    'grade',
+    'annual_inc',
+    'sub_grade',
+    'purpose',
+    'is_inc_v',
+    'emp_length',
+    'home_ownership',
+    'dti',
+    'fico_range_low',
+    'inq_last_6mths',
+    'revol_bal',
+    'revol_util',
+    'total_bc_limit',
+    'num_rev_accts',
+    'pub_rec_bankruptcies',
+    'tax_liens',
+    );
+
+my @actually_on_places = (
+    1,
+    1,
+    1,
+    1,
+);
+
+my @features = split(/,/, $feature_set);
+foreach my $f (@features) {
+    push @actually_on_places, $f;
+}
+
+my $number_on_places = 0;
+foreach my $onp (@actually_on_places) {
+    if ($onp) {
+        $number_on_places++;
+    }
+}
+
 my $first = 1;
 
 ## Total interest recieved
@@ -218,22 +266,40 @@ sub get_net_return {
     my $last_payment_d = str2time($row->[$procossor_place_rev->{"last_pymnt_d"}]);
     my $len = ($last_payment_d - $issue_d);
     my $mon = int($len/2629743);
-    if ($len > 31556926) { # we use loans > 1 year
+    my $charged_off = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CHARGED OFF";
+    if ($len > 31556926 || $charged_off) { # we use loans > 1 year
         my $interest = $row->[$procossor_place_rev->{"total_rec_int"}];
         my $late_fee = $row->[$procossor_place_rev->{"total_rec_late_fee"}];
         my $princip = $row->[$procossor_place_rev->{"funded_amnt"}];
-        my $charged_off = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CHARGED OFF";
+        my $recieved = $row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}];
+
         #my $default = $row->[$procossor_place_rev->{"total_rec_prncp"}] - $row->[$procossor_place_rev->{"funded_amnt"}];    
 
-        my $default = max(0,($row->[$procossor_place_rev->{"installment"}] * $mon) - 
-            ($row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}]));
+        my $default = max(0,(($row->[$procossor_place_rev->{"installment"}] * $mon) - $recieved));
         if ($charged_off) {
-            $default = $row->[$procossor_place_rev->{"funded_amnt"}] -
-                ($row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}])
+            $default = max(0,$row->[$procossor_place_rev->{"funded_amnt"}] - $recieved);
         }
 
-        my $ret = (1.0 + (($interest + $late_fee - $default) / ($princip * 1.00)) * $princip / ($princip * 1.)) ** 12.0 - 1;
-        #print($ret," ",$default," ",$mon,"\n");
+        my $ret = (((1.0 + (($interest + $late_fee - $default) / ($princip * 1.00))) ** 12.0)) - 1.0;
+        
+
+
+        #((1 + (INTEREST + LATE_FEE - DEFAULT) / FUNDED_AMOUNT) ^ 12) - 1
+        
+        #my $ret = ((1.0 + (($interest + $late_fee - $default) / ($princip * 1.00)) * $princip / ($princip * 1.)) ** 12.0) - 1;
+
+
+        
+#print($ret," ",$default," ",$mon," ", $interest ," ",$late_fee," ",$princip,"\n");
+
+        
+        #print($princip, " ", ($recieved + $late_fee - $default), " ", $recieved," ", $late_fee," ", $default, " ",$mon,"\n");
+        #my $ror = ROR($princip, ($recieved + $late_fee - $default));
+        #print "ROR: " . $ror, " ", ((($ror/$mon) + 1) * 12) - 1,"\n";
+        
+        #my $ror = ((1 + (($recieved-$princip)/$princip) / $mon ) ** ($mon) - 1.);
+        
+
         return $ret;
     } else {
         return undef;
@@ -295,37 +361,41 @@ while ( my $row = $csv->getline( $fh ) ) {
     
         my $vr = [];
         if (defined($y) && $keep > 0) {
-            foreach my $k (@forced_places) {
-                if (defined $X->{$k}) {
-                    push @$vr, $X->{$k};
-                } else {
-                    if ($k eq "str_rep") {
-                        if ($training_init > 0) {
-                            my $s = join("-", ($row->[5],$row->[7],$row->[11]));
-                            push @$vr, $s;
-                        } else {
-                            push @$vr, "";
-                        }
-                    } elsif ($k eq "zip") {
-                        if (!$zip) {
-                            die("\nEXCEPT $k\n");
-                        } else {
-                            push @$vr, $zip;
-                        }
-                    } elsif ($k eq "payoff") {
-                        push @$vr, $payoff;
-                    } elsif ($k eq "cost") {
-                        push @$vr, $cost;
+            for (my $jj=0; $jj<scalar(@actually_on_places); $jj++) {
+                if ($actually_on_places[$jj]) {
+                    my $k = $on_places[$jj];
+                    
+                    if (defined $X->{$k}) {
+                        push @$vr, $X->{$k};
                     } else {
-                        print(Dumper($X));
-                        die("\nEXCEPT $k\n");
-                        push @$vr, 0;
+                        if ($k eq "str_rep") {
+                            if ($training_init > 0) {
+                                my $s = join("-", ($row->[5],$row->[7],$row->[11]));
+                                push @$vr, $s;
+                            } else {
+                                push @$vr, "";
+                            }
+                        } elsif ($k eq "zip") {
+                            if (!$zip) {
+                            die("\nEXCEPT $k\n");
+                            } else {
+                                push @$vr, $zip;
+                            }
+                        } elsif ($k eq "payoff") {
+                            push @$vr, $payoff;
+                        } elsif ($k eq "cost") {
+                        push @$vr, $cost;
+                        } else {
+                            print(Dumper($X));
+                            die("\nEXCEPT $k\n");
+                            push @$vr, 0;
+                        }
                     }
                 }
             }
         
             ## Add the target here
-            if (scalar @$vr == @forced_places && defined($y)) {
+            if (scalar @$vr == $number_on_places && defined($y)) {
                 push @$vr, $y;
                 push @data, $vr;
             }
@@ -344,17 +414,23 @@ $csv->eof or $csv->error_diag();
 close $fh;
 
 if ($debug) {
-    foreach my $k (@forced_places) {
-        print $k,",";
+    for (my $jj=0; $jj<scalar(@actually_on_places); $jj++) {
+        if ($actually_on_places[$jj]) {
+            my $k = $on_places[$jj];
+            print $k,",";
+        }
     }
     print("\n");
 }
 
-print(scalar(@data),",",scalar(@forced_places)-1,"\n");
+print(scalar(@data),",",$number_on_places-1,"\n");
 
-foreach my $p (@forced_places) {
-    if ($p ne "str_rep") {
-        print $p,", ";
+for (my $jj=0; $jj<scalar(@actually_on_places); $jj++) {
+    if ($actually_on_places[$jj]) {
+        my $p = $on_places[$jj];
+        if ($p ne "str_rep") {
+            print $p,", ";
+        }
     }
 }
 
@@ -368,7 +444,7 @@ foreach my $r (@data) {
             if ($training_init > 0) {
                 printf("\'%s\', ", @$r[$j]);
             }
-        } elsif ($j < scalar(@forced_places)) {
+        } elsif ($j < $number_on_places) {
             printf("%.2f, ", @$r[$j]);
         } else {
             printf("%.2f", @$r[$j]);
@@ -415,9 +491,9 @@ sub get_term{
 sub get_apr{
     my $l = shift;
     if ($l =~ /(.*)?\%/) {
-        return $1;
+        return int($1);
     } elsif ($l =~ /(.*)?\.(.*)/) {
-        return $1.".".$2;
+        return int($1);
     }
     return undef;
 }
@@ -603,18 +679,41 @@ sub get_total_bal_ex_mort{
 }
 sub get_revol_bal{
     my $l = shift;
-    return ($l ne "")? $l: 0.0;
+    if ($l == "") { return 0; }
+    switch ($l) {
+        case {0 < $l && $l <= 1000} { return 100; }
+        case {1000 < $l && $l <= 2000} { return 200; }
+        case {2000 < $l && $l <= 5000} { return 300; }
+        case {5000 < $l && $l <= 10000} { return 400; }
+        case {10000 < $l && $l <= 20000} { return 500; }
+        case {20000 < $l && $l <= 40000} { return 600; }
+        case {40000 < $l && $l <= 50000} { return 700; }
+        case {50000 < $l && $l <= 60000} { return 800; }
+        case {60000 < $l && $l <= 70000} { return 900; }
+        case {70000 < $l} { return 1000; }
+    }
+    return undef;
 }
 sub get_revol_util{
     my $l = shift;
     if ($l =~ /(.*)?\%/) {
-        return $1;
+        return int($1);
     }
-    return undef;
+    return 0;
 }
 sub get_total_bc_limit{
     my $l = shift;
-    return ($l ne "")? $l: 0.0;
+    if ($l == "") { return 0; }
+    switch ($l) {
+        case {0 < $l && $l <= 1000} { return 100; }
+        case {1000 < $l && $l <= 2000} { return 200; }
+        case {2000 < $l && $l <= 5000} { return 300; }
+        case {5000 < $l && $l <= 10000} { return 400; }
+        case {10000 < $l && $l <= 20000} { return 500; }
+        case {20000 < $l && $l <= 40000} { return 600; }
+        case {40000 < $l} { return 700; }
+    }
+    return undef;
 }
 sub get_total_acc{
     my $l = shift;

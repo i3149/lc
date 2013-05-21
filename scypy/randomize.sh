@@ -3,7 +3,7 @@
 file=${1}.csv
 randomized=${1}_random.csv
 temp=${1}_temp.csv
-echo $file $randomized
+#echo $file $randomized
 
 if [ ! -f "$file" ]; then
     echo "Error: " $file "does not exist"

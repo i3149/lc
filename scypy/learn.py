@@ -1,4 +1,4 @@
-print __doc__
+#print __doc__
 
 # Author: Ian Pye <ianpye@gmail.com>
 # License: BSD Style.
@@ -36,8 +36,10 @@ C = 1.0
 #X_val_scaled = X_val
 X_learn_scaled = preprocessing.scale(X_learn)
 X_val_scaled = preprocessing.scale(X_val)
-
 n_features = X_learn.shape[1]
+if n_features == 0:
+    exit(0)
+
 
 classifiers = {
     'L1 logistic': LogisticRegression(C=C, penalty='l1'),
@@ -52,7 +54,7 @@ regressors = {
 #    'SVR_rbf':                 SVR(kernel='rbf', C=1e3, gamma=0.1),
 #    'SVR_linear':                 SVR(kernel='linear', C=1e3),
  #   'SVR_ploy':                 SVR(kernel='poly', C=1e3, degree=2),
-    'DT':                tree.DecisionTreeRegressor(),
+#    'DT':                tree.DecisionTreeRegressor(),
     'Gradient_LS':       GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='ls'),
     'Gradient_LAD':      GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='lad'),
     'Gradient_HUBER':    GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='huber')
@@ -73,12 +75,16 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
     passed = 0
     amount_invested = 0
 
+    base_score = 0.0
+    base_invested = 0.0
+    total_seen = 0
+
     print(name)
 
     for i in range(X_val_scaled.shape[0]):
         res = classifier.predict(X_val_scaled[i])
         #print("%f %f %f" % (res[0], y_val[i], (y_val[i] - res[0])))
-        if res[0] > 23.0:
+        if res[0] > 10.:
             #print(y_val[i])
             total_score += (loans.cost[i] * (y_val[i] / 100.))
             #total_score += (y_val[i] / 100.)
@@ -88,6 +94,9 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
             #print(loans.ids[i])
         else:
             passed+=1
+        base_score += (loans.cost[i] * (y_val[i] / 100.))
+        base_invested += loans.cost[i]
+        total_seen+=1
 
     #y_pred = classifier.predict(X_val_scaled)
     #classif_rate = np.mean(y_pred.ravel() == y_val.ravel()) * 100
@@ -103,8 +112,8 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
     # make importances relative to max importance
     #feature_importance = 100.0 * (feature_importance / feature_importance.max())
     #print(name)
+    
     print(loans.labels)
-
     if (hasattr(classifier, 'feature_importances_')):
         feature_importance = classifier.feature_importances_
         print(feature_importance)
@@ -113,4 +122,9 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
                                                              passed, locale.format("%d", amount_invested, grouping=True)))
     if (amount_invested > 0):
         print("ROI: %.02f" % ((total_score / amount_invested)*100.))
+
+    print("Base: $%s on %d loans, invested %s" % (locale.format("%d", base_score, grouping=True), total_seen, 
+                                                             locale.format("%d", base_invested, grouping=True)))
+    if (base_invested > 0):
+        print("BASE ROI: %.02f" % ((base_score / base_invested)*100.))
 
