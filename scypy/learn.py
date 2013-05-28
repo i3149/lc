@@ -3,7 +3,7 @@
 # Author: Ian Pye <ianpye@gmail.com>
 # License: BSD Style.
 
-import pylab as pl
+#import pylab as pl
 import numpy as np
 import loader as ld
 import sys
@@ -34,12 +34,13 @@ C = 1.0
 
 #X_learn_scaled = X_learn
 #X_val_scaled = X_val
+
 X_learn_scaled = preprocessing.scale(X_learn)
 X_val_scaled = preprocessing.scale(X_val)
+
 n_features = X_learn.shape[1]
 if n_features == 0:
     exit(0)
-
 
 classifiers = {
     'L1 logistic': LogisticRegression(C=C, penalty='l1'),
@@ -69,7 +70,9 @@ n_classifiers = len(classifiers)
 #print(scores)
 
 for index, (name, classifier) in enumerate(regressors.iteritems()):
+
     classifier.fit(X_learn_scaled, y_learn)
+
     total_score = 0.0
     invested = 0
     passed = 0
@@ -84,16 +87,15 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
     for i in range(X_val_scaled.shape[0]):
         res = classifier.predict(X_val_scaled[i])
         #print("%f %f %f" % (res[0], y_val[i], (y_val[i] - res[0])))
-        if res[0] > 10.:
-            #print(y_val[i])
+        if res[0] > 12.0:
             total_score += (loans.cost[i] * (y_val[i] / 100.))
-            #total_score += (y_val[i] / 100.)
             invested+=1
-            #print(total_score)
             amount_invested += loans.cost[i]
             #print(loans.ids[i])
+
         else:
             passed+=1
+
         base_score += (loans.cost[i] * (y_val[i] / 100.))
         base_invested += loans.cost[i]
         total_seen+=1
@@ -118,13 +120,14 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
         feature_importance = classifier.feature_importances_
         print(feature_importance)
 
-    print("Made: $%s on %d loans, passed %d, invested %s" % (locale.format("%d", total_score, grouping=True), invested, 
+    print("Made: $%s on %d loans, passed %d, invested %s" % (locale.format("%d", total_score, grouping=True), invested,
                                                              passed, locale.format("%d", amount_invested, grouping=True)))
+
     if (amount_invested > 0):
         print("ROI: %.02f" % ((total_score / amount_invested)*100.))
 
     print("Base: $%s on %d loans, invested %s" % (locale.format("%d", base_score, grouping=True), total_seen, 
                                                              locale.format("%d", base_invested, grouping=True)))
+
     if (base_invested > 0):
         print("BASE ROI: %.02f" % ((base_score / base_invested)*100.))
-

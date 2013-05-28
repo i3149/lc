@@ -6,10 +6,8 @@ use Text::CSV;
 use Switch;
 use Date::Parse;
 use List::Util qw(reduce max);
-use Finance::Performance::Calc qw (:all);
 
 ## Load up the zips
-
 my $zip_file            = $ARGV[0];
 my $loan_file           = $ARGV[1];
 my $training_init       = $ARGV[2];
@@ -256,53 +254,71 @@ my $CLASS_ACCEPT_FIELD = "loan_status";
 ## Classification
 #my $CLASS_TARGET_FIELD = "loan_status";
 
+sub get_months {
+    my $max = $_[0];
+    my $invest = $_[1];
+    my $rate = $_[2] / 12.0;
+    my $total_int_rec = $_[3];
+    my $payment = $_[4];
+
+    my $month = 0;
+    my $int_rec = 0;
+
+    for my $i (1 .. $max) {
+        $month++;        
+        my $interest = (($rate / 100.0) * $invest * 100.0) / 100.0;
+        my $current_payment = $payment - $interest;
+
+        $invest -= $current_payment;
+        $int_rec += $interest;
+
+        if ($int_rec >= $total_int_rec) {
+            last;
+        }
+    }
+
+    return $month;
+}
+
 ## Compute Annual RR
 ## Look at loan amounts by band
-
+## Correct for Fully Paid and Charged off. Not correct for current.
 sub get_net_return {
     my $row = shift;
 
     my $issue_d = str2time($row->[$procossor_place_rev->{"issue_d"}]);
+    my $term = get_term($row->[$procossor_place_rev->{"term"}]);
     my $last_payment_d = str2time($row->[$procossor_place_rev->{"last_pymnt_d"}]);
     my $len = ($last_payment_d - $issue_d);
-    my $mon = int($len/2629743);
+    my $max_mon = int($len/2629743);
+
+    my $payment = $row->[$procossor_place_rev->{"installment"}];
+    my $rate = $row->[$procossor_place_rev->{"int_rate"}];
+    my $interest = $row->[$procossor_place_rev->{"total_rec_int"}];
+    my $late_fee = $row->[$procossor_place_rev->{"total_rec_late_fee"}];
+    my $princip = $row->[$procossor_place_rev->{"funded_amnt"}];
+    my $recieved = $row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}];
+
+    my $mon = get_months($max_mon, $princip, $rate, $interest, $payment);
     my $charged_off = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CHARGED OFF";
-    if ($len > 31556926 || $charged_off) { # we use loans > 1 year
-        my $interest = $row->[$procossor_place_rev->{"total_rec_int"}];
-        my $late_fee = $row->[$procossor_place_rev->{"total_rec_late_fee"}];
-        my $princip = $row->[$procossor_place_rev->{"funded_amnt"}];
-        my $recieved = $row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}];
+    my $current = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CURRENT";
+    my $fully_paid = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "FULLY_PAID";
 
-        #my $default = $row->[$procossor_place_rev->{"total_rec_prncp"}] - $row->[$procossor_place_rev->{"funded_amnt"}];    
-
-        my $default = max(0,(($row->[$procossor_place_rev->{"installment"}] * $mon) - $recieved));
-        if ($charged_off) {
-            $default = max(0,$row->[$procossor_place_rev->{"funded_amnt"}] - $recieved);
+    if ($current) { # we use loans > 1 year
+        if ($mon >= 12) {
+            my $rata = $mon/($term*1.0);
+            my $ret = ( ($recieved / ($princip * $rata)) ** (12.0 / ( $mon )) ) - 1;
+            return $ret * 100.0;
+        } else {
+            return undef;
         }
-
-        my $ret = (((1.0 + (($interest + $late_fee - $default) / ($princip * 1.00))) ** 12.0)) - 1.0;
-        
-
-
-        #((1 + (INTEREST + LATE_FEE - DEFAULT) / FUNDED_AMOUNT) ^ 12) - 1
-        
-        #my $ret = ((1.0 + (($interest + $late_fee - $default) / ($princip * 1.00)) * $princip / ($princip * 1.)) ** 12.0) - 1;
-
-
-        
-#print($ret," ",$default," ",$mon," ", $interest ," ",$late_fee," ",$princip,"\n");
-
-        
-        #print($princip, " ", ($recieved + $late_fee - $default), " ", $recieved," ", $late_fee," ", $default, " ",$mon,"\n");
-        #my $ror = ROR($princip, ($recieved + $late_fee - $default));
-        #print "ROR: " . $ror, " ", ((($ror/$mon) + 1) * 12) - 1,"\n";
-        
-        #my $ror = ((1 + (($recieved-$princip)/$princip) / $mon ) ** ($mon) - 1.);
-        
-
-        return $ret;
-    } else {
-        return undef;
+    } else { ## Here we use charged_off or fully paid 
+        if (($mon > 0) && ($fully_paid || $charged_off)) { 
+            my $ret = ( ($recieved / ($princip * 1.0)) ** (12.0 / ( $mon )) ) - 1;
+            return $ret * 100.0;
+        } else {
+            return undef;
+        }
     }
 }
 
