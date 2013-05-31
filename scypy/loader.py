@@ -3,7 +3,7 @@
 import numpy as np
 import csv
 
-VALIDATION_PERCENT = .50
+VALIDATION_PERCENT = .75
 
 class Bunch(dict):
     """Container object for datasets: dictionary-like object that
@@ -53,20 +53,23 @@ def load_data(filename):
                  labels=strs, payoff=payoff, cost=cost)
 
 def load_for_predic(filename):
+    START_PLACE = 3
+
     data_file = csv.reader(open(filename))
     temp = next(data_file)
     n_samples = int(temp[0])
-    n_features = int(temp[1])-2
+    n_features = int(temp[1]) - START_PLACE
 
     data = np.empty((n_samples, n_features))
     ids = np.empty((n_samples,), dtype=np.int)
     strs = []
 
     for i, ir in enumerate(data_file):
-        data[i] = np.asarray(ir[2:-1], dtype=np.float)
-        ids[i] = np.asarray(ir[0], dtype=np.int)
+        if i > 0:
+            data[i-1] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
+            ids[i-1] = np.asarray(ir[0], dtype=np.int)
+            strs.append(ir[1])
         #strs[i] = ir[1]
         #print(ir[1])
-        strs.append(ir[1])
 
     return Bunch(data=data, ids=ids, strs=strs)

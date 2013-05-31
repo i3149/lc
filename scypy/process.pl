@@ -145,7 +145,7 @@ my @forced_places = (
     'str_rep',
     'payoff',
     'cost',
-    'funded_amnt',
+    'loan_amnt',
     'zip',
 #    'loan_amnt',
 #    'term',
@@ -202,7 +202,7 @@ my @on_places = (
     'str_rep',
     'payoff',
     'cost',
-    'funded_amnt',
+    'loan_amnt',
     'zip',
     'term',
     'apr',
@@ -354,13 +354,15 @@ while ( my $row = $csv->getline( $fh ) ) {
         my $city_state;
         my $zip;
 
-        $y = get_net_return($row);
+        if (!$y) {
+            $y = get_net_return($row);
+        }
         $zip = get_zip($row);
         if (defined($y)) {
             $keep = 1;
         }
 
-        my $payoff = get_payoff($row);
+        my $payoff = ($y == 1)? "0": get_payoff($row);
         my $cost = get_cost($row);
 
         for (my $i=0; $i<scalar(@$row); $i++) {
@@ -476,7 +478,16 @@ sub get_id{
 sub get_member_id{return undef}
 sub get_loan_amnt{
     my $l = shift;
-    return $l;
+    switch ($l) {
+        case {0 < $l && $l <= 1000} { return 100; }
+        case {1000 < $l && $l <= 2000} { return 200; }
+        case {2000 < $l && $l <= 5000} { return 300; }
+        case {5000 < $l && $l <= 10000} { return 400; }
+        case {10000 < $l && $l <= 20000} { return 500; }
+        case {20000 < $l && $l <= 40000} { return 600; }
+        case {40000 < $l} { return 700; }
+    }
+    return undef;
 }
 sub get_funded_amnt{
     my $l = shift;

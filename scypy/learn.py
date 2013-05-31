@@ -86,13 +86,28 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
 
     for i in range(X_val_scaled.shape[0]):
         res = classifier.predict(X_val_scaled[i])
-        #print("%f %f %f" % (res[0], y_val[i], (y_val[i] - res[0])))
-        if res[0] > 12.0:
-            total_score += (loans.cost[i] * (y_val[i] / 100.))
-            invested+=1
-            amount_invested += loans.cost[i]
-            #print(loans.ids[i])
 
+        inv = 0
+
+        #print("%f %f %f" % (res[0], y_val[i], (y_val[i] - res[0])))
+        if res[0] >= 17.0:
+            inv = 50
+        elif res[0] >= 16.0:
+            inv = 47
+        elif res[0] >= 15.0:
+            inv = 46
+        elif res[0] >= 12.0:
+            inv = 40
+        elif res[0] >= 11.0:
+            inv = 30
+        elif res[0] >= 10.0:
+            inv = 25
+
+        if inv > 0:
+            total_score += (inv * (y_val[i] / 100.))
+            invested+=1
+            amount_invested += inv
+            #print(loans.ids[i])
         else:
             passed+=1
 
@@ -105,7 +120,7 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
     #print("classif_rate for %s : %f " % (name, classif_rate))
 
     ## Save for later
-    #joblib.dump(classifier, dest + name + '_class.pkl') 
+    joblib.dump(classifier, dest + name + '_class.pkl') 
 
     #if (name == "DT"):
     #    with open("/tmp/dt.dot", 'w') as f:
