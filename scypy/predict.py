@@ -1,5 +1,3 @@
-print __doc__
-
 # Author: Ian Pye <ianpye@gmail.com>
 # License: BSD Style.
 
@@ -8,17 +6,21 @@ import numpy as np
 import loader as ld
 import sys
 import smtplib
+
+from datetime import datetime
+
 from email.mime.text import MIMEText
+from email.utils import COMMASPACE
 
 from sklearn import preprocessing
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.externals import joblib
 
-fromaddr = 'ianpye@gmail.com'
-toaddrs  = 'ianpye@gmail.com, joshua.motta@gmail.com'  
-subject = 'LendingClubBuy'
-username = 'ianpye@gmail.com'  
+fromaddr = f = open(".from").read().strip()
+toaddrs  = f = open(".to").read().strip().split(",")
+subject = 'LendingClubBuy (' + datetime.today().strftime("%d/%m/%Y %H:%M") + ")"
+username = fromaddr  
 password = f = open(".passwd").read().strip()
 prefix = "https://www.lendingclub.com/browse/loanDetail.action?loan_id="
 
@@ -29,6 +31,9 @@ clsfile = sys.argv[2]
 cls = joblib.load(clsfile)
 
 X_scaled = preprocessing.scale(loans.data)
+
+print ("Running, from: " + fromaddr)
+print (toaddrs)
 
 buy = []
 
@@ -58,7 +63,9 @@ server.login(username,password)
 msg = MIMEText("You should\n" + '\n'.join(buy))
 msg['Subject'] = subject
 msg['From'] = fromaddr
-msg['To'] = toaddrs
+msg['To'] = COMMASPACE.join(toaddrs)
 
 server.sendmail(fromaddr, toaddrs, msg.as_string())  
 server.quit()  
+
+print("Found " + str(len(buy)) + " Loans -- " + datetime.today().strftime("%d/%m/%Y %H:%M"))
