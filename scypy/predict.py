@@ -39,28 +39,37 @@ buy = []
 
 for i in range(X_scaled.shape[0]):
     res = cls.predict(X_scaled[i])
+    intr = loans.intr[i]
+    
+    actRes = min(res[0], intr)
+
+#    print(str(intr) + " " + str(res) + "\n" )
+
     inv = 0;
-    if res[0] >= 40.0:
-        inv = 50
-    elif res[0] >= 39.0:
-        inv = 47
-    elif res[0] >= 37.0:
-        inv = 46
-    elif res[0] >= 35.0:
+    if actRes >= 20.0:
         inv = 40
-    elif res[0] >= 25.0:
+    elif actRes >= 19.0:
+        inv = 35
+    elif actRes >= 18.0:
         inv = 30
-    elif res[0] >= 20.0:
+    elif actRes >= 37.0:
+        inv = 25
+    elif actRes >= 26.0:
+        inv = 25
+    elif actRes >= 15.0:
         inv = 25
 
     if inv > 0:
-        buy.append("* Buy: " + prefix + str(loans.ids[i]) + " @ $" + str(inv))
+        buy.append(("* Buy: " + prefix + str(loans.ids[i]) + " @ $" + str(inv) + " -- " + str(actRes), actRes))
+        #print("* Buy: " + prefix + str(loans.ids[i]) + " @ $" + str(inv) + "\n")
 
 server = smtplib.SMTP('smtp.gmail.com:587')  
 server.starttls()  
 server.login(username,password)  
 
-msg = MIMEText("You should\n" + '\n'.join(buy))
+buy.sort(key=lambda tup: tup[1], reverse=True)
+
+msg = MIMEText("You should\n" + '\n'.join([x[0] for x in buy]))
 msg['Subject'] = subject
 msg['From'] = fromaddr
 msg['To'] = COMMASPACE.join(toaddrs)
@@ -69,3 +78,5 @@ server.sendmail(fromaddr, toaddrs, msg.as_string())
 server.quit()  
 
 print("Found " + str(len(buy)) + " Loans -- " + datetime.today().strftime("%d/%m/%Y %H:%M"))
+
+#print('\n'.join([x[0] for x in buy]))

@@ -388,8 +388,8 @@ while ( my $row = $csv->getline( $fh ) ) {
                     } else {
                         if ($k eq "str_rep") {
                             if ($training_init > 0) {
-                                my $s = join("-", ($row->[5],$row->[7],$row->[11]));
-                                push @$vr, $s;
+                                #my $s = join("-", ($row->[5],$row->[7],$row->[11]));
+                                push @$vr, $row->[$procossor_place_rev->{"int_rate"}];
                             } else {
                                 push @$vr, "";
                             }
@@ -460,7 +460,7 @@ foreach my $r (@data) {
             printf("%d, ", @$r[$j]);
         } elsif ($j == 1) {
             if ($training_init > 0) {
-                printf("\'%s\', ", @$r[$j]);
+                printf("%.2f, ", @$r[$j]);
             }
         } elsif ($j < $number_on_places) {
             printf("%.2f, ", @$r[$j]);

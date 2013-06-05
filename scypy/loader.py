@@ -62,14 +62,14 @@ def load_for_predic(filename):
 
     data = np.empty((n_samples, n_features))
     ids = np.empty((n_samples,), dtype=np.int)
-    strs = []
+    intr = np.empty((n_samples,), dtype=np.float)
 
     for i, ir in enumerate(data_file):
         if i > 0:
             data[i-1] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
             ids[i-1] = np.asarray(ir[0], dtype=np.int)
-            strs.append(ir[1])
+            intr[i-1] = np.asarray(ir[1], dtype=np.float)
         #strs[i] = ir[1]
         #print(ir[1])
 
-    return Bunch(data=data, ids=ids, strs=strs)
+    return Bunch(data=data, ids=ids, intr=intr)
