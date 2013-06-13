@@ -1,6 +1,6 @@
 #!/bin/bash
 
-features="1,1,1,1,0,1,1,0,0,0,0,0,0"
+features="1,1,1,1,0,1,1,1,1,0,0,0,0,1"
 new_file=InFunding2StatsNew.csv.new
 old_file=InFunding2StatsNew.csv
 curl -s 'https://www.lendingclub.com/fileDownload.action?file=InFunding2StatsNew.csv&type=gen' > $new_file
@@ -15,7 +15,7 @@ then
     mv $new_file $old_file
     perl ./process.pl zipcodes.csv $old_file 1 "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"  > run/in_funding.csv
     python extract_features.py run/in_funding.csv run/in_funding_extracted.csv $features
-    python -W ignore::DeprecationWarning predict.py run/in_funding_extracted.csv classifiers/Gradient_HUBER_class.pkl    
+    python -W ignore::DeprecationWarning predict.py run/in_funding_extracted.csv classifiers/Gradient_LS_class.pkl    
 else
     echo "NOOP"
 fi

@@ -52,23 +52,19 @@ def load_data(filename):
                  strs=strs)
 
 def load_for_predic(filename):
-    START_PLACE = 3
+    START_PLACE = 1
 
     data_file = csv.reader(open(filename))
     temp = next(data_file)
     n_samples = int(temp[0])
-    n_features = int(temp[1]) - START_PLACE
+    n_features = int(temp[1])
 
     data = np.empty((n_samples, n_features))
-    ids = np.empty((n_samples,), dtype=np.int)
-    intr = np.empty((n_samples,), dtype=np.float)
+    info = [None]*n_samples
 
     for i, ir in enumerate(data_file):
         if i > 0:
             data[i-1] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
-            ids[i-1] = np.asarray(ir[0], dtype=np.int)
-            intr[i-1] = np.asarray(ir[1], dtype=np.float)
-        #strs[i] = ir[1]
-        #print(ir[1])
+            info[i-1] = json.loads(base64.b64decode(ir[0]))
 
-    return Bunch(data=data, ids=ids, intr=intr)
+    return Bunch(data=data, info=info)

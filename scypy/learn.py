@@ -83,7 +83,7 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
             inv = 40
         elif res[0] >= 11.0:
             inv = 30
-        elif res[0] >= 10.0:
+        elif res[0] >= 8.0:
             inv = 25
 
         if inv > 0:

@@ -387,6 +387,10 @@ while ( my $row = $csv->getline( $fh ) ) {
             $keep = 1;
         }
 
+        if (get_term($row->[$procossor_place_rev->{"term"}]) != 36) {
+            $keep = 0;
+        }
+
         my $payoff = ($y == 1)? "0": get_payoff($row);
         my $cost = get_cost($row);
         my $extra_info = get_extra_info($row, $payoff, $cost);

@@ -39,29 +39,29 @@ buy = []
 
 for i in range(X_scaled.shape[0]):
     res = cls.predict(X_scaled[i])
-    intr = loans.intr[i]
+    intr = loans.info[i]["int"]
     
     actRes = min(res[0], intr)
 
-#    print(str(intr) + " " + str(res) + "\n" )
+#    print(str(intr) + " " + str(res[0]) + "\n" )
 
     inv = 0;
-    if actRes >= 20.0:
+    if res[0] >= 17.0:
+        inv = 50
+    elif res[0] >= 16.0:
+        inv = 47
+    elif res[0] >= 15.0:
+        inv = 46
+    elif res[0] >= 12.0:
         inv = 40
-    elif actRes >= 19.0:
-        inv = 35
-    elif actRes >= 18.0:
+    elif res[0] >= 11.0:
         inv = 30
-    elif actRes >= 17.0:
-        inv = 25
-    elif actRes >= 16.0:
-        inv = 25
-    elif actRes >= 15.0:
+    elif res[0] >= 8.0:
         inv = 25
 
     if inv > 0:
-        buy.append(("* Buy: " + prefix + str(loans.ids[i]) + " @ $" + str(inv) + " -- " + str(actRes), actRes))
-        #print("* Buy: " + prefix + str(loans.ids[i]) + " @ $" + str(inv) + "\n")
+        buy.append(("* Buy: " + prefix + str(loans.info[i]["id"]) + " @ $" + str(inv) + " -- " + str(actRes), actRes))
+        #print("* Buy: " + prefix + str(loans.info[i]["id"]) + " @ $" + str(inv) + "\n")
 
 server = smtplib.SMTP('smtp.gmail.com:587')  
 server.starttls()  
