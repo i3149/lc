@@ -52,9 +52,9 @@ for i in range(X_scaled.shape[0]):
         inv = 35
     elif actRes >= 18.0:
         inv = 30
-    elif actRes >= 37.0:
+    elif actRes >= 17.0:
         inv = 25
-    elif actRes >= 26.0:
+    elif actRes >= 16.0:
         inv = 25
     elif actRes >= 15.0:
         inv = 25

@@ -42,32 +42,15 @@ n_features = X_learn.shape[1]
 if n_features == 0:
     exit(0)
 
-classifiers = {
-    'L1 logistic': LogisticRegression(C=C, penalty='l1'),
-    'L2 logistic': LogisticRegression(C=C, penalty='l2'),
- #   'SVC':         SVC(),
-    'Linear SVC':  SVC(kernel='linear', C=C, probability=True),
-    'DT':          tree.DecisionTreeClassifier(),
-    'GB':          GradientBoostingClassifier(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0)
-    }
-
 regressors = {
-#    'SVR_rbf':                 SVR(kernel='rbf', C=1e3, gamma=0.1),
-#    'SVR_linear':                 SVR(kernel='linear', C=1e3),
- #   'SVR_ploy':                 SVR(kernel='poly', C=1e3, degree=2),
-#    'DT':                tree.DecisionTreeRegressor(),
+    #    'SVR_rbf':                 SVR(kernel='rbf', C=1e3, gamma=0.1),
+    #    'SVR_linear':                 SVR(kernel='linear', C=1e3),
+    #   'SVR_ploy':                 SVR(kernel='poly', C=1e3, degree=2),
+    #    'DT':                tree.DecisionTreeRegressor(),
     'Gradient_LS':       GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='ls'),
     'Gradient_LAD':      GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='lad'),
     'Gradient_HUBER':    GradientBoostingRegressor(n_estimators=100, learning_rate=1.0, max_depth=1, random_state=0, loss='huber')
     }
-
-n_classifiers = len(classifiers)
-
-#selector = SelectPercentile(f_classif, percentile=10)
-#selector.fit(X, y)
-#scores = -np.log10(selector.pvalues_)
-#scores /= scores.max()
-#print(scores)
 
 for index, (name, classifier) in enumerate(regressors.iteritems()):
 
@@ -111,8 +94,8 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
         else:
             passed+=1
 
-        base_score += (loans.cost[i] * (y_val[i] / 100.))
-        base_invested += loans.cost[i]
+        base_score += (loans.info[i]["cost"] * (y_val[i] / 100.))
+        base_invested += loans.info[i]["cost"]
         total_seen+=1
 
     #y_pred = classifier.predict(X_val_scaled)
@@ -130,7 +113,7 @@ for index, (name, classifier) in enumerate(regressors.iteritems()):
     #feature_importance = 100.0 * (feature_importance / feature_importance.max())
     #print(name)
     
-    print(loans.labels)
+    print(loans.strs)
     if (hasattr(classifier, 'feature_importances_')):
         feature_importance = classifier.feature_importances_
         print(feature_importance)

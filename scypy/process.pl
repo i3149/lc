@@ -4,8 +4,10 @@ use strict;
 use Data::Dumper;
 use Text::CSV;
 use Switch;
+use JSON::XS;
 use Date::Parse;
-use List::Util qw(reduce max);
+use MIME::Base64;
+use List::Util qw(reduce max min);
 
 ## Load up the zips
 my $zip_file            = $ARGV[0];
@@ -141,7 +143,6 @@ my %processors = (
     );
 
 my @forced_places = (
-    'id',
     'str_rep',
     'payoff',
     'cost',
@@ -197,11 +198,9 @@ my @forced_places = (
 #    'total_rec_int',
     );
 
+#Required labels
 my @on_places = (
-    'id',
     'str_rep',
-    'payoff',
-    'cost',
     'loan_amnt',
     'zip',
     'term',
@@ -226,9 +225,6 @@ my @on_places = (
 
 my @actually_on_places = (
     1,
-    1,
-    1,
-    1,
 );
 
 my @features = split(/,/, $feature_set);
@@ -245,6 +241,7 @@ foreach my $onp (@actually_on_places) {
 
 my $first = 1;
 
+# @TODO -- remove
 ## Total interest recieved
 my $CLASS_TARGET_FIELD_REC_INC = "total_rec_int";
 my $CLASS_TARGET_FIELD_REC_PRC = "total_rec_prncp";
@@ -254,10 +251,11 @@ my $CLASS_ACCEPT_FIELD = "loan_status";
 ## Classification
 #my $CLASS_TARGET_FIELD = "loan_status";
 
+# @TODO -- rename: calc_loan_duration_months
 sub get_months {
     my $max = $_[0];
     my $invest = $_[1];
-    my $rate = $_[2] / 12.0;
+    my $rate = $_[2] / 12.0; #Get monthly rate from anual
     my $total_int_rec = $_[3];
     my $payment = $_[4];
 
@@ -265,8 +263,10 @@ sub get_months {
     my $int_rec = 0;
 
     for my $i (1 .. $max) {
-        $month++;        
+        $month=$i;        
         my $interest = (($rate / 100.0) * $invest * 100.0) / 100.0;
+        # @TODO -- make?? my $interest = (($rate * 1.0) * ($invest * 1.0)) / 100.0;
+    
         my $current_payment = $payment - $interest;
 
         $invest -= $current_payment;
@@ -290,25 +290,35 @@ sub get_net_return {
     my $term = get_term($row->[$procossor_place_rev->{"term"}]);
     my $last_payment_d = str2time($row->[$procossor_place_rev->{"last_pymnt_d"}]);
     my $len = ($last_payment_d - $issue_d);
-    my $max_mon = int($len/2629743);
+    my $max_mon = int($len/2629743); ### Number of seconds in a month
+
+    if ($term > 36) {
+        return undef;
+    }
 
     my $payment = $row->[$procossor_place_rev->{"installment"}];
     my $rate = $row->[$procossor_place_rev->{"int_rate"}];
     my $interest = $row->[$procossor_place_rev->{"total_rec_int"}];
     my $late_fee = $row->[$procossor_place_rev->{"total_rec_late_fee"}];
     my $princip = $row->[$procossor_place_rev->{"funded_amnt"}];
+
+    ## @TODO make be get_payoff()
     my $recieved = $row->[$procossor_place_rev->{"total_rec_prncp"}] + $row->[$procossor_place_rev->{"total_rec_int"}];
 
     my $mon = get_months($max_mon, $princip, $rate, $interest, $payment);
     my $charged_off = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CHARGED OFF";
     my $current = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CURRENT";
-    my $fully_paid = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "FULLY_PAID";
+    my $fully_paid = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "FULLY PAID";
 
-    if ($current) { # we use loans > 1 year
+    if ($current) { # we use loans >= 1 year
         if ($mon >= 12) {
             my $rata = $mon/($term*1.0);
+            #my $rata = 1.0;
+            ## @TODO Make just interest.
+            ## @TODO factor out into seperate function, add unit tests.
             my $ret = ( ($recieved / ($princip * $rata)) ** (12.0 / ( $mon )) ) - 1;
-            return $ret * 100.0;
+            #return $ret * 100.0;
+            return min(1.0*$interest, $ret * 100.0);
         } else {
             return undef;
         }
@@ -322,6 +332,7 @@ sub get_net_return {
     }
 }
 
+## @TODO -- use hash function instead
 sub get_zip {
     my $row = shift;
     my $city_a = uc($row->[$procossor_place_rev->{"addr_city"}]);
@@ -340,10 +351,24 @@ sub get_payoff {
 
 sub get_cost {
     my $row = shift;
-    return ($row->[$procossor_place_rev->{"funded_amnt"}]);
+    return 1.0 * ($row->[$procossor_place_rev->{"funded_amnt"}]);
 }
 
-open $fh, "<:encoding(utf8)", $loan_file or die "test.csv: $!";
+## @TODO -- test on str to float conversions
+sub get_extra_info {
+    my ($row,$payoff,$cost) = @_;
+    my $ee = {
+        "grade" => $row->[$procossor_place_rev->{"grade"}],
+        "int" => 1.0 * $row->[$procossor_place_rev->{"int_rate"}],
+        "id" => $row->[$procossor_place_rev->{"id"}],
+        "payoff" => $payoff,
+        "cost" => $cost,
+        "term" => 1.0 * get_term($row->[$procossor_place_rev->{"term"}]),
+    };
+    return encode_json($ee);
+}
+
+open $fh, "<:encoding(utf8)", $loan_file or die "$loan_file: $!";
 while ( my $row = $csv->getline( $fh ) ) {
 
     if (!$first) {
@@ -364,6 +389,7 @@ while ( my $row = $csv->getline( $fh ) ) {
 
         my $payoff = ($y == 1)? "0": get_payoff($row);
         my $cost = get_cost($row);
+        my $extra_info = get_extra_info($row, $payoff, $cost);
 
         for (my $i=0; $i<scalar(@$row); $i++) {
             if ($processors{$procossor_place[$i]}) {
@@ -387,22 +413,13 @@ while ( my $row = $csv->getline( $fh ) ) {
                         push @$vr, $X->{$k};
                     } else {
                         if ($k eq "str_rep") {
-                            if ($training_init > 0) {
-                                #my $s = join("-", ($row->[5],$row->[7],$row->[11]));
-                                push @$vr, $row->[$procossor_place_rev->{"int_rate"}];
-                            } else {
-                                push @$vr, "";
-                            }
+                                push @$vr, $extra_info;
                         } elsif ($k eq "zip") {
-                            if (!$zip) {
-                            die("\nEXCEPT $k\n");
+                            if (!$zip) { #@TODO -- need special treetment?
+                                die("\nEXCEPT $k\n");
                             } else {
                                 push @$vr, $zip;
                             }
-                        } elsif ($k eq "payoff") {
-                            push @$vr, $payoff;
-                        } elsif ($k eq "cost") {
-                        push @$vr, $cost;
                         } else {
                             print(Dumper($X));
                             die("\nEXCEPT $k\n");
@@ -446,9 +463,7 @@ print(scalar(@data),",",$number_on_places-1,"\n");
 for (my $jj=0; $jj<scalar(@actually_on_places); $jj++) {
     if ($actually_on_places[$jj]) {
         my $p = $on_places[$jj];
-        if ($p ne "str_rep") {
-            print $p,", ";
-        }
+        print $p,", ";
     }
 }
 
@@ -457,11 +472,9 @@ print("value\n");
 foreach my $r (@data) {
     for (my $j=0; $j<scalar(@$r); $j++) {
         if ($j == 0) {
-            printf("%d, ", @$r[$j]);
-        } elsif ($j == 1) {
-            if ($training_init > 0) {
-                printf("%.2f, ", @$r[$j]);
-            }
+            my $enc = encode_base64(@$r[$j], "|");
+            chomp($enc);
+            printf("%s, ", $enc);
         } elsif ($j < $number_on_places) {
             printf("%.2f, ", @$r[$j]);
         } else {
@@ -485,7 +498,7 @@ sub get_loan_amnt{
         case {5000 < $l && $l <= 10000} { return 400; }
         case {10000 < $l && $l <= 20000} { return 500; }
         case {20000 < $l && $l <= 40000} { return 600; }
-        case {40000 < $l} { return 700; }
+        case {40000 > $l} { return 700; }
     }
     return undef;
 }
@@ -498,7 +511,7 @@ sub get_funded_amnt{
         case {5000 < $l && $l <= 10000} { return 400; }
         case {10000 < $l && $l <= 20000} { return 500; }
         case {20000 < $l && $l <= 40000} { return 600; }
-        case {40000 < $l} { return 700; }
+        case {40000 > $l} { return 700; }
     }
     return undef;
 }
@@ -660,8 +673,9 @@ sub get_fico_range_low{
         case {400 < $l && $l <= 400} { return 400; }
         case {500 < $l && $l <= 600} { return 500; }
         case {600 < $l && $l <= 700} { return 600; }
-        case {700 < $l} { return 700; }
+        case {$l > 700} { return 700; }
     }
+    
     return undef;
 }
 sub get_fico_range_high{
@@ -717,7 +731,7 @@ sub get_revol_bal{
         case {40000 < $l && $l <= 50000} { return 700; }
         case {50000 < $l && $l <= 60000} { return 800; }
         case {60000 < $l && $l <= 70000} { return 900; }
-        case {70000 < $l} { return 1000; }
+        case { $l > 70000 } { return 1000; }
     }
     return undef;
 }
@@ -738,7 +752,7 @@ sub get_total_bc_limit{
         case {5000 < $l && $l <= 10000} { return 400; }
         case {10000 < $l && $l <= 20000} { return 500; }
         case {20000 < $l && $l <= 40000} { return 600; }
-        case {40000 < $l} { return 700; }
+        case {$l > 40000} { return 700; }
     }
     return undef;
 }
