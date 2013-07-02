@@ -13,13 +13,13 @@ use CapitalD::Process qw(init_places extract_loans);
 ## Load up the zips
 my $loan_file           = $ARGV[0];
 my $training_init       = $ARGV[1];
-my $feature_set         = $ARGV[2];
-my $debug               = ($ARGV[3] eq "DEBUG")? 1: 0;
+my $debug               = ($ARGV[2] eq "DEBUG")? 1: 0;
 
 #Required labels
 my @on_places = (
     'str_rep',
     'loan_amnt',
+    'funded_amnt',
     'zip',
     'term',
     'apr',
@@ -45,19 +45,13 @@ if (!$loan_file) {
     die("Usage: perl process.pl loan_file training_init featured DEBUG?")
 }
 
-my @actually_on_places = (
-    1,
-);
-
-my $number_on_places = init_places($feature_set, \@actually_on_places);
-my $data = extract_loans($loan_file, $training_init, \@actually_on_places, \@on_places, $debug);
+my $number_on_places = init_places(\@on_places);
+my $data = extract_loans($loan_file, $training_init, \@on_places, $debug);
 
 print(scalar(@$data),",",$number_on_places-1,"\n");
-for (my $jj=0; $jj<scalar(@actually_on_places); $jj++) {
-    if ($actually_on_places[$jj]) {
+for (my $jj=0; $jj<scalar(@on_places); $jj++) {
         my $p = $on_places[$jj];
         print $p,", ";
-    }
 }
     
 print("value\n");
@@ -71,7 +65,7 @@ foreach my $r (@$data) {
                 chomp($enc);
                 printf("%s, ", $enc);
             }
-        } elsif ($j < $number_on_places) {
+        } elsif ($j < $number_on_places + 1) {
             printf("%.2f, ", @$r[$j]);
         } else {
             printf("%.2f", @$r[$j]);

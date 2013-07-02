@@ -5,7 +5,7 @@ import csv
 import base64
 import json
 
-LEARN_PERCENT = .75
+LEARN_PERCENT = .5
 
 class Bunch(dict):
     """Container object for datasets: dictionary-like object that
@@ -28,9 +28,11 @@ def load_data(filename):
 
     data_learn = np.empty((n_learn, n_features))
     target_learn = np.empty((n_learn,), dtype=np.float)
+    class_learn = np.empty((n_learn,), dtype=np.float)
 
     data_val = np.empty((n_validate, n_features))
     target_val = np.empty((n_validate,), dtype=np.float)
+    class_val = np.empty((n_validate,), dtype=np.float)
 
     info = [None]*n_validate
     strs = []
@@ -40,15 +42,17 @@ def load_data(filename):
             strs.append(ir[START_PLACE:-1])
         else:
             if i <= n_learn:
-                data_learn[i-1] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
-                target_learn[i-1] = np.asarray(ir[-1], dtype=np.float)
+                data_learn[i-1] = np.asarray(ir[START_PLACE:-2], dtype=np.float)
+                target_learn[i-1] = np.asarray(ir[-2], dtype=np.float)
+                class_learn[i-1] = np.asarray(ir[-1], dtype=np.float)
             else:                
-                data_val[(i-1)-n_learn] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
-                target_val[(i-1)-n_learn] = np.asarray(ir[-1], dtype=np.float)
+                data_val[(i-1)-n_learn] = np.asarray(ir[START_PLACE:-2], dtype=np.float)
+                target_val[(i-1)-n_learn] = np.asarray(ir[-2], dtype=np.float)
+                class_val[(i-1)-n_learn] = np.asarray(ir[-1], dtype=np.float)
                 info[(i-1)-n_learn] = json.loads(base64.b64decode(ir[0]))
 
-    return Bunch(data_learn=data_learn, target_learn=target_learn, 
-                 data_val=data_val, target_val=target_val, info=info,
+    return Bunch(data_learn=data_learn, target_learn=target_learn, class_learn=class_learn, 
+                 data_val=data_val, target_val=target_val, class_val=class_val, info=info,
                  strs=strs)
 
 def load_for_predic(filename):

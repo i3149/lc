@@ -9,7 +9,7 @@ use Date::Parse;
 use MIME::Base64;
 use List::Util qw(reduce max min);
 use CapitalD::Process qw(init_places extract_loans);
-use Test::More tests => 23;
+use Test::More tests => 31;
 
 ## Load up the zips
 my $loan_file           = "./t/TestData.csv";

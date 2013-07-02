@@ -7,7 +7,7 @@ sub fitness {
     my $cmd = "./run.sh $parts";
     my $res = `$cmd`;
     if ($res =~ /ROI: (.*)/) {
-        print $1,"\n";
+        print $1," $parts \n";
         return $1;
     }
     return 0; 
@@ -35,8 +35,8 @@ my $ga = AI::Genetic::Pro->new(
     -variable_length => 1,                # turn variable length ON
     );
         
-# init population of 20-bit vectors
-$ga->init(20);
+# init population of 21-bit vectors
+$ga->init(21);
         
 # evolve 10 generations
 $ga->evolve(10);

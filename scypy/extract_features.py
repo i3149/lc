@@ -25,6 +25,7 @@ for i, ir in enumerate(data_file):
         if feature == "1":
             res.append(ir[index])
         index+=1
+    res.append(ir[-2])
     res.append(ir[-1])
 
     f.write(",".join(res)+"\n")    

@@ -132,18 +132,8 @@ my %processors = (
 
 my $number_on_places = 0;
 sub init_places {
-    my ($feature_set, $actually_on_places) = @_; 
-    my @features = split(/,/, $feature_set);
-    foreach my $f (@features) {
-        push @$actually_on_places, $f;
-    }
-
-    foreach my $onp (@$actually_on_places) {
-        if ($onp) {
-            $number_on_places++;
-        }
-    }
-
+    my ($feature_set) = @_;
+    $number_on_places = scalar(@$feature_set);
     return $number_on_places;
 }
 
@@ -174,6 +164,30 @@ sub get_months {
     }
 
     return $month;
+}
+
+## Returns whether or not the loan is performing.
+sub get_class {
+    my $row = shift;
+    my $issue_d = str2time($row->[$procossor_place_rev->{"issue_d"}]);
+    my $term = get_term($row->[$procossor_place_rev->{"term"}]);
+    my $last_payment_d = str2time($row->[$procossor_place_rev->{"last_pymnt_d"}]);
+    my $len = ($last_payment_d - $issue_d);
+    my $max_mon = int($len/2629743); ### Number of seconds in a month
+
+    my $charged_off = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CHARGED OFF";
+    my $current = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "CURRENT";
+    my $fully_paid = uc($row->[$procossor_place_rev->{"loan_status"}]) eq "FULLY PAID";
+
+    if ($charged_off) {
+        return 0;
+    } elsif ($fully_paid) {
+        return 1;
+    } elsif ($current && $max_mon >= 12) {
+        return 1;
+    } else {
+        return undef;
+    }
 }
 
 ## Compute Annual RR
@@ -211,7 +225,8 @@ sub get_net_return {
         if ($mon >= 12) {
             my $rata = $mon/($term*1.0);
             my $ret = ( ($recieved / ($princip * $rata)) ** (1.0 / ( $mon / 12.0 ) ) ) - 1;
-            return min(1.0*$rate, $ret * 100.0);
+            #return min(1.0*$rate, $ret * 100.0);
+            return 1.0*$rate;
         } else {
             return undef;
         }
@@ -261,7 +276,7 @@ sub get_extra_info {
 
 sub extract_loans {
 
-    my ($loan_file, $training_init, $actually_on_places, $on_places, $debug) = @_;
+    my ($loan_file, $training_init, $on_places, $debug) = @_;
     my $first = 1;
     my @data = ();
     my $csv = Text::CSV->new ( { binary => 1 } )  # should set binary attribute.
@@ -272,6 +287,7 @@ sub extract_loans {
 
         if (!$first) {
             my $y = $training_init;
+            my $class = $training_init;
             my $keep = undef;
             my $X = {};
             my $next_x = 0;
@@ -280,6 +296,7 @@ sub extract_loans {
             
             if (!$y) {
                 $y = get_net_return($row);
+                $class = get_class($row);
             }
             $zip = get_zip($row);
             if (defined($y)) {
@@ -308,33 +325,30 @@ sub extract_loans {
             
             my $vr = [];
             if (defined($y) && $keep > 0) {
-                for (my $jj=0; $jj<scalar(@$actually_on_places); $jj++) {
-                    if ($actually_on_places->[$jj]) {
-                        my $k = $on_places->[$jj];
-                        
-                        if (defined $X->{$k}) {
-                            push @$vr, $X->{$k};
-                        } else {
-                            if ($k eq "str_rep") {
-                                push @$vr, $extra_info;
-                            } elsif ($k eq "zip") {
-                                if (!$zip) { #@TODO -- need special treetment?
-                                    die("\nEXCEPT $k\n");
-                                } else {
-                                    push @$vr, $zip;
-                                }
-                            } else {
-                                print(Dumper($X));
+                for (my $jj=0; $jj<scalar(@$on_places); $jj++) {
+                    my $k = $on_places->[$jj];
+                    if (defined $X->{$k}) {
+                        push @$vr, $X->{$k};
+                    } else {
+                        if ($k eq "str_rep") {
+                            push @$vr, $extra_info;
+                        } elsif ($k eq "zip") {
+                            if (!$zip) { #@TODO -- need special treetment?
                                 die("\nEXCEPT $k\n");
-                                push @$vr, 0;
+                            } else {
+                                push @$vr, $zip;
                             }
+                        } else {
+                            print(Dumper($X));
+                            die("\nEXCEPT $k\n");
+                            push @$vr, 0;
                         }
                     }
                 }
                 
                 ## Add the target here
                 if (scalar @$vr == $number_on_places && defined($y)) {
-                    push @$vr, $y;
+                    push @$vr, $y, $class;
                     push @data, $vr;
                 }
             }
@@ -368,7 +382,7 @@ sub get_loan_amnt{
         case {5000 < $l && $l <= 10000} { return 400; }
         case {10000 < $l && $l <= 20000} { return 500; }
         case {20000 < $l && $l <= 40000} { return 600; }
-        case {40000 > $l} { return 700; }
+        case {$l > 40000} { return 700; }
     }
     return undef;
 }
@@ -381,7 +395,7 @@ sub get_funded_amnt{
         case {5000 < $l && $l <= 10000} { return 400; }
         case {10000 < $l && $l <= 20000} { return 500; }
         case {20000 < $l && $l <= 40000} { return 600; }
-        case {40000 > $l} { return 700; }
+        case {$l > 40000} { return 700; }
     }
     return undef;
 }
@@ -453,9 +467,20 @@ sub get_home_ownership{
     return undef;
 
 }
-sub get_annual_inc{
+sub get_annual_inc {
     my $l = shift;
-    return $l;
+
+    switch ($l) {
+        case {0 < $l && $l <= 10000} { return 100; }
+        case {10000 < $l && $l <= 20000} { return 200; }
+        case {20000 < $l && $l <= 30000} { return 300; }
+        case {30000 < $l && $l <= 60000} { return 400; }
+        case {60000 < $l && $l <= 80000} { return 500; }
+        case {80000 < $l && $l <= 100000} { return 600; }
+        case {$l > 100000} { return 700; }
+    }
+
+    return undef;
 }
 sub get_is_inc_v{
     my $l = shift;
