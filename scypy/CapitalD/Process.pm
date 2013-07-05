@@ -389,7 +389,7 @@ sub get_loan_amnt{
 sub get_funded_amnt{
     my $l = shift;
     switch ($l) {
-        case {0 < $l && $l <= 1000} { return 100; }
+        case {0 <= $l && $l <= 1000} { return 100; }
         case {1000 < $l && $l <= 2000} { return 200; }
         case {2000 < $l && $l <= 5000} { return 300; }
         case {5000 < $l && $l <= 10000} { return 400; }

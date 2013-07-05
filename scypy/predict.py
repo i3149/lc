@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 # Author: Ian Pye <ianpye@gmail.com>
 # License: BSD Style.
 
@@ -6,6 +8,10 @@ import numpy as np
 import loader as ld
 import sys
 import smtplib
+import re
+
+from os import listdir
+from os.path import isfile, join
 
 from datetime import datetime
 
@@ -17,51 +23,79 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.externals import joblib
 
-fromaddr = f = open(".from").read().strip()
-toaddrs  = f = open(".to").read().strip().split(",")
-subject = 'LendingClubBuy (' + datetime.today().strftime("%d/%m/%Y %H:%M") + ")"
-username = fromaddr  
-password = f = open(".passwd").read().strip()
-prefix = "https://www.lendingclub.com/browse/loanDetail.action?loan_id="
+fromaddr         = f = open(".from").read().strip()
+toaddrs          = f = open(".to").read().strip().split(",")
+subject          = 'LendingClubBuy (' + datetime.today().strftime("%d/%m/%Y %H:%M") + ")"
+username         = fromaddr  
+password         = f = open(".passwd").read().strip()
+prefix           = "https://www.lendingclub.com/browse/loanDetail.action?loan_id="
+data_dir         = sys.argv[1]
+input_dir        = sys.argv[2]
 
-datafile = sys.argv[1]
-loans = ld.load_for_predic(datafile)
+def run_predict(loans, name, regressor, ids):
 
-clsfile = sys.argv[2]
-cls = joblib.load(clsfile)
+    print(name)
+    X_scaled = preprocessing.scale(loans.data)
 
-X_scaled = preprocessing.scale(loans.data)
+    for i in range(X_scaled.shape[0]):
 
-print ("Running, from: " + fromaddr)
-print (toaddrs)
+        if (not loans.info[i]["id"] in ids):
+            ids[loans.info[i]["id"]] = [];
 
+        res = regressor.predict(X_scaled[i])
+        intr = loans.info[i]["int"]
+        actRes = min(res[0], intr)
+
+        inv = 0
+
+        if actRes >= 8.0:
+            inv = 25
+            #print("%f %f %f %s" % (res[0], actRes, intr, loans.info[i]["id"]))            
+
+        if inv > 0:
+            ids[loans.info[i]["id"]].append(1)
+        else:
+            ids[loans.info[i]["id"]].append(0)
+
+def load_model(filename, regressors):
+    m = re.search(r"_(.*?)_.csv_saved\.dat\.pkl$", f)
+    if m != None:
+        print(input_dir+"/"+f)
+        regressors[m.group(1)] = joblib.load(filename)
+
+def load_data(filename, loans):
+    m = re.search(r"_(.*?)_.csv$", f)
+    if m != None:
+        loans[m.group(1)] = ld.load_for_predic(filename)
+
+## Load up a list of loans, each with a different feature set.
+input_files = [ f for f in listdir(input_dir) if isfile(join(input_dir,f)) ]
+data_files = [ f for f in listdir(data_dir) if isfile(join(data_dir,f)) ]
+regressors = {}
+ids = {}
+loans = {}
+
+for f in data_files:
+    if re.search(r"\.csv$", f):
+        print(data_dir+"/"+f)
+        load_data(data_dir+"/"+f, loans)
+
+for f in input_files:
+    if re.search(r"\.pkl$", f):
+        load_model(input_dir+"/"+f, regressors)
+
+for name, r in regressors.iteritems():
+    run_predict(loans[name], name, r, ids)
+
+passed = 0;
 buy = []
-
-for i in range(X_scaled.shape[0]):
-    res = cls.predict(X_scaled[i])
-    intr = loans.info[i]["int"]
-    
-    actRes = min(res[0], intr)
-
-#    print(str(intr) + " " + str(res[0]) + "\n" )
-
-    inv = 0;
-    if res[0] >= 17.0:
-        inv = 50
-    elif res[0] >= 16.0:
-        inv = 47
-    elif res[0] >= 15.0:
-        inv = 46
-    elif res[0] >= 12.0:
-        inv = 40
-    elif res[0] >= 11.0:
-        inv = 30
-    elif res[0] >= 8.0:
-        inv = 25
-
-    if inv > 0:
-        buy.append(("* Buy: " + prefix + str(loans.info[i]["id"]) + " @ $" + str(inv) + " -- " + str(actRes), actRes))
-        #print("* Buy: " + prefix + str(loans.info[i]["id"]) + " @ $" + str(inv) + "\n")
+for lid, lst in ids.iteritems():
+    inv = 0
+    if sum(lst) >= 3:
+        inv = 10 * sum(lst)
+        buy.append(("* Buy: " + prefix + lid + " @ $" + str(inv) + " -- " + str(lst),sum(lst)))
+    else:
+        passed+=1
 
 server = smtplib.SMTP('smtp.gmail.com:587')  
 server.starttls()  
@@ -78,5 +112,3 @@ server.sendmail(fromaddr, toaddrs, msg.as_string())
 server.quit()  
 
 print("Found " + str(len(buy)) + " Loans -- " + datetime.today().strftime("%d/%m/%Y %H:%M"))
-
-#print('\n'.join([x[0] for x in buy]))

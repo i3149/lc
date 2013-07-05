@@ -9,6 +9,7 @@ import loader as ld
 import sys
 import StringIO
 import locale
+import re
 
 from os import listdir
 from os.path import isfile, join
@@ -80,50 +81,20 @@ def run_learn(filename, loans, name, regressor, classif_name, classif, ids, lidt
 
         if inv > 0:
             ids[loans.info[i]["id"]].append(1)
-            #total_score += (inv * (y_val[i] / 100.))
-            #invested += 1
-            #amount_invested += inv
-            #print(loans.ids[i])
         else:
             ids[loans.info[i]["id"]].append(0)
-
-        #base_score += (loans.info[i]["cost"] * (y_val[i] / 100.))
-        #base_invested += loans.info[i]["cost"]
-        #total_seen+=1
 
     #y_pred = classif.predict(X_val_scaled)
     #classif_rate = np.mean(y_pred.ravel() == loans.class_val.ravel()) * 100
     #print("classif_rate for %s : %f " % (classif_name, classif_rate))
 
     ## Save for later
-    ##joblib.dump(regressor, filename+".pkl") 
-    ##joblib.dump(classif, filename+"_class.pkl") 
-
-    #if (name == "DT"):
-    #    with open("/tmp/dt.dot", 'w') as f:
-    #        f = tree.export_graphviz(classifier, out_file=f)
-        
-    # make importances relative to max importance
-    #feature_importance = 100.0 * (feature_importance / feature_importance.max())
-    #print(name)
+    joblib.dump(regressor, filename + ".pkl") 
+    joblib.dump(classif, filename + "_class.pkl") 
     
-    #print(loans.strs)
     #if (hasattr(regressor, 'feature_importances_')):
     #    feature_importance = regressor.feature_importances_
     #    print(feature_importance)
-
-    #print("Made: $%s on %d loans, passed %d, invested %s" % (locale.format("%d", total_score, grouping=True), invested,
-#                                                             passed, locale.format("%d", amount_invested, grouping=True)))
-
-    #if (amount_invested > 0):
-    #    print("ROI: %.02f" % ((total_score / amount_invested)*100.))
-
-    #print("Base: $%s on %d loans, invested %s" % (locale.format("%d", base_score, grouping=True), total_seen, 
- #                                                            locale.format("%d", base_invested, grouping=True)))
-
-    #if (base_invested > 0):
-    #    print("BASE ROI: %.02f" % ((base_score / base_invested)*100.))
-
 
 def load_data(filename, loans):
     loans[filename+"_saved.dat"] = ld.load_data(filename)
@@ -134,8 +105,9 @@ loans = {}
 lidtoyval = {}
 
 for f in input_files:
-    print(input_dir+"/"+f)
-    load_data(input_dir+"/"+f, loans)
+    if re.search(r"\.csv$", f):
+        print(input_dir+"/"+f)
+        load_data(input_dir+"/"+f, loans)
     
 for index, (name, r) in enumerate(regressors.iteritems()):
 
@@ -166,8 +138,17 @@ for index, (name, r) in enumerate(regressors.iteritems()):
         else:
             passed+=1
 
+        base_score += (25 * (lidtoyval[lid] / 100.))
+        base_invested += 25
+        total_seen+=1
+
     print("Made: $%s on %d loans, passed %d, invested %s" % (locale.format("%d", total_score, grouping=True), invested,
                                                              passed, locale.format("%d", amount_invested, grouping=True)))
     if (amount_invested > 0):
         print("ROI: %.02f" % ((total_score / amount_invested)*100.))
 
+    print("Base: $%s on %d loans, invested %s" % (locale.format("%d", base_score, grouping=True), total_seen, 
+                                                  locale.format("%d", base_invested, grouping=True)))
+
+    if (base_invested > 0):
+        print("BASE ROI: %.02f" % ((base_score / base_invested)*100.))

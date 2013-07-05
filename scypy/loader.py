@@ -68,7 +68,7 @@ def load_for_predic(filename):
 
     for i, ir in enumerate(data_file):
         if i > 0:
-            data[i-1] = np.asarray(ir[START_PLACE:-1], dtype=np.float)
+            data[i-1] = np.asarray(ir[START_PLACE:-2], dtype=np.float)
             info[i-1] = json.loads(base64.b64decode(ir[0]))
 
     return Bunch(data=data, info=info)
