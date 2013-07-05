@@ -1,7 +1,7 @@
 #!/bin/bash
 
 inputs=$1
-#perl ./process.pl zipcodes.csv LoanStatsTest.csv 0 $inputs > datasets/5k_regression.csv
+perl ./process.pl LoanStatsTest.csv 0 > datasets/5k_regression.csv
 ./randomize.sh datasets/5k_regression
-python extract_features.py datasets/5k_regression_random.csv datasets/5k_extracted.csv $inputs
-python learn.py datasets/5k_extracted.csv classifiers/
+for i in `head -3 no_funded_tenners`; do ./run_multi.sh $i; done
+python learn.py run_exp
