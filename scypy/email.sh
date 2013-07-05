@@ -13,9 +13,9 @@ if [ "$new_sum" != "$old_sum" ]
 then
     rm $old_file
     mv $new_file $old_file
-    perl ./process.pl zipcodes.csv $old_file 1 "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"  > run/in_funding.csv
-    python extract_features.py run/in_funding.csv run/in_funding_extracted.csv $features
-    python -W ignore::DeprecationWarning predict.py run/in_funding_extracted.csv classifiers/Gradient_LS_class.pkl    
+    perl process.pl $old_file 1 > run/in_funding.csv
+    for i in `head -3 no_funded_tenners`; do python extract_features.py run/in_funding.csv run_pre_exp/extracted_${i}_.csv $i; done
+    python -W ignore::DeprecationWarning ./predict.py ./run_pre_exp/ ./run_exp/
 else
     echo "NOOP"
 fi
