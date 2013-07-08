@@ -96,26 +96,23 @@ def run_learn(filename, loans, name, regressor, classif_name, classif, ids, lidt
     #    feature_importance = regressor.feature_importances_
     #    print(feature_importance)
 
-def load_data(filename, loans):
-    loans[filename+"_saved.dat"] = ld.load_data(filename)
+def load_data(filename):
+    return ld.load_data(filename)
 
 ## Load up a list of loans, each with a different feature set.
 input_files = [ f for f in listdir(input_dir) if isfile(join(input_dir,f)) ]
-loans = {}
 lidtoyval = {}
-
-for f in input_files:
-    if re.search(r"\.csv$", f):
-        print(input_dir+"/"+f)
-        load_data(input_dir+"/"+f, loans)
     
 for index, (name, r) in enumerate(regressors.iteritems()):
 
     ## For each file in inputs, run
     ids = {}
-    
-    for f, l in loans.iteritems():
-        run_learn(f, l, name, r, used_class, classifiers[used_class], ids, lidtoyval)
+
+    for f in input_files:
+        if re.search(r"\.csv$", f):
+            print(input_dir+"/"+f)
+            loan = load_data(input_dir+"/"+f)
+            run_learn(f, loan, name, r, used_class, classifiers[used_class], ids, lidtoyval)
 
     # now, for each ids
     total_score = 0.0
