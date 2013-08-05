@@ -267,6 +267,7 @@ sub get_extra_info {
         "grade" => $row->[$procossor_place_rev->{"grade"}],
         "int" => 1.0 * $row->[$procossor_place_rev->{"int_rate"}],
         "id" => $row->[$procossor_place_rev->{"id"}],
+        "status" => uc($row->[$procossor_place_rev->{"loan_status"}]),
         "payoff" => $payoff,
         "cost" => $cost,
         "term" => 1.0 * get_term($row->[$procossor_place_rev->{"term"}]),

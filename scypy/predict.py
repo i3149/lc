@@ -58,7 +58,7 @@ def run_predict(loans, name, regressor, ids):
             ids[loans.info[i]["id"]].append(0)
 
 def load_model(filename, regressors):
-    m = re.search(r"_(.*?)_.csv_saved\.dat\.pkl$", f)
+    m = re.search(r"_(.*?)_.csv\.pkl$", f)
     if m != None:
         print(input_dir+"/"+f)
         regressors[m.group(1)] = joblib.load(filename)
@@ -91,7 +91,7 @@ passed = 0;
 buy = []
 for lid, lst in ids.iteritems():
     inv = 0
-    if sum(lst) >= 3:
+    if sum(lst) >= 6:
         inv = 10 * sum(lst)
         buy.append(("* Buy: " + prefix + lid + " @ $" + str(inv) + " -- " + str(lst),sum(lst)))
     else:

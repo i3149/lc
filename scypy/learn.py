@@ -10,6 +10,7 @@ import sys
 import StringIO
 import locale
 import re
+import gc
 
 from os import listdir
 from os.path import isfile, join
@@ -28,6 +29,7 @@ locale.setlocale(locale.LC_ALL, '')
 
 C               = 1.0
 input_dir       = sys.argv[1]
+base_buy_level  = int(sys.argv[2])
 used_class      = "L1logistic"
 
 classifiers = {
@@ -52,7 +54,7 @@ regressors = {
 
 def run_learn(filename, loans, name, regressor, classif_name, classif, ids, lidtoyval):
 
-    print(name + " - " + classif_name)
+    #print(name + " - " + classif_name)
 
     X_learn = loans.data_learn
     y_learn = loans.target_learn
@@ -110,9 +112,10 @@ for index, (name, r) in enumerate(regressors.iteritems()):
 
     for f in input_files:
         if re.search(r"\.csv$", f):
-            print(input_dir+"/"+f)
+            #print(input_dir+"/"+f)
             loan = load_data(input_dir+"/"+f)
-            run_learn(f, loan, name, r, used_class, classifiers[used_class], ids, lidtoyval)
+            run_learn(input_dir+"/"+f, loan, name, r, used_class, classifiers[used_class], ids, lidtoyval)
+            gc.collect()
 
     # now, for each ids
     total_score = 0.0
@@ -127,8 +130,8 @@ for index, (name, r) in enumerate(regressors.iteritems()):
     for lid, lst in ids.iteritems():
 
         inv = 0
-        if sum(lst) >= 3:
-            inv = 10 * sum(lst)
+        if sum(lst) >= base_buy_level:
+            inv = min(300, 10 * sum(lst))
             total_score += (inv * (lidtoyval[lid] / 100.))
             invested += 1
             amount_invested += inv
